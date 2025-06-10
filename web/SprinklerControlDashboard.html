@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThingSpeak Channels</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <h1>ThingSpeak Channels</h1>
+    <div id="channels"></div>
+
+    <script>
+        const channels = [
+            { id: '597924', wapiKey: '69I7O26OZTBI61YC', rapiKey: 'VV1UZ2CRNCUJ8VER', dchan: '592680' },
+            { id: '844392', wapiKey: 'PSTRJSPIUD25HQWP', rapiKey: 'OJXNM9UUX2V6P8UD', dchan: '844390' },
+            { id: '1005406', wapiKey: 'T7D60PPPWRQ0IZVZ', rapiKey: 'BMKL2AZ5SB4SUNFZ', dchan: '1005405' },
+            { id: '1050522', wapiKey: 'ZUT29K9LHEZX62C6', rapiKey: 'P5SQIBO7FZNH9XBV', dchan: '1050521' },
+            { id: '1160824', wapiKey: 'EJ2Z4MOV2LQAEVCQ', rapiKey: 'CN409WRNXUVJYKGQ', dchan: '1160823' }
+        ];
+        const fieldLabel = ['Water On', 'Sleep T', 'Mode', 'Hours', 'Bat Min', 'LevelMin', 'WakeCon', 'Extra'];
+
+        
+function createTable(channel) {
+    // --- Channel Info Row as a DIV above the table ---
+    const infoDiv = document.createElement('div');
+    infoDiv.style.marginBottom = '8px';
+    infoDiv.innerHTML = `
+        <strong>Channel ID:</strong> <span id="channel_${channel.id}_id">${channel.id}</span>
+        &nbsp;&nbsp;
+        <strong>Channel Name:</strong> <span id="channel_${channel.id}_name">Loading...</span>
+    `;
+
+    const table = document.createElement('table');
+table.style.width = '1200px'; // Set table width 
+    const colgroup = document.createElement('colgroup');
+for (let i = 0; i < 7; i++) {
+    const col = document.createElement('col');
+    colgroup.appendChild(col);
+}
+table.appendChild(colgroup);
+
+    const thead = document.createElement('thead');
+    const tbody = document.createElement('tbody');
+
+    // ...existing code for headerRow, dataRow, modeRow, iframeRow...
+
+    // (No channel info row in the table anymore)
+
+    // --- Table construction as before ---
+    const headerRow = document.createElement('tr');
+    for (let i = 1; i <= 8; i++) {
+        if (i === 3) continue; // Skip Mode column in header
+        const th = document.createElement('th');
+        th.textContent = `${fieldLabel[i - 1]}`;
+        headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const dataRow = document.createElement('tr');
+    for (let i = 1; i <= 8; i++) {
+        if (i === 3) continue; // Skip Mode column in data row
+        const td = document.createElement('td');
+        const input = document.createElement('input');
+        input.style.width = '50px';
+        input.type = 'text';
+        input.id = `channel_${channel.id}_field_${i}`;
+
+        if (i === 4) {
+            const wakeHInput = document.createElement('input');
+            wakeHInput.type = 'text';
+            wakeHInput.id = `channel_${channel.id}_wakeH`;
+            wakeHInput.placeholder = 'WakeH';
+            wakeHInput.style.width = '50px';
+
+            const sleepHInput = document.createElement('input');
+            sleepHInput.type = 'text';
+            sleepHInput.id = `channel_${channel.id}_sleepH`;
+            sleepHInput.placeholder = 'SleepH';
+            sleepHInput.style.width = '50px';
+
+            td.appendChild(wakeHInput);
+            td.appendChild(sleepHInput);
+            td.appendChild(input);
+
+            input.addEventListener('input', () => {
+                const hours = parseInt(input.value, 10);
+                if (!isNaN(hours)) {
+                    wakeHInput.value = hours % 12;
+                    sleepHInput.value = Math.round(hours / 12);
+                }
+            });
+        } else {
+            td.appendChild(input);
+        }
+        dataRow.appendChild(td);
+    }
+    tbody.appendChild(dataRow);
+
+    // --- Add Mode Row (was column 3) ---
+    const modeRow = document.createElement('tr');
+    const modeLabelCell = document.createElement('td');
+    modeLabelCell.colSpan = 1;
+    modeLabelCell.textContent = fieldLabel[2]; // "Mode"
+    modeRow.appendChild(modeLabelCell);
+
+    const modeCell = document.createElement('td');
+    modeCell.colSpan = 6; // Adjusted for 7 total columns (1 for label + 6 for content)
+
+    const labels = ['SleeepEn', 'PumpEn', 'NightSlp', 'LeveChk', 'BattChk'];
+    labels.forEach((label, index) => {
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `channel_${channel.id}_${label}`;
+        checkbox.dataset.bit = index; // Store the bit position
+
+        const checkboxLabel = document.createElement('label');
+        checkboxLabel.htmlFor = checkbox.id;
+        checkboxLabel.textContent = label;
+
+        checkbox.addEventListener('change', () => updateBinaryValue(channel.id));
+
+        modeCell.appendChild(checkbox);
+        modeCell.appendChild(checkboxLabel);
+        modeCell.appendChild(document.createElement('span')).innerHTML = '&nbsp;&nbsp;';
+    });
+
+    // Hidden input for the mode value (field_3)
+    const modeInput = document.createElement('input');
+    modeInput.type = 'text';
+    modeInput.id = `channel_${channel.id}_field_3`;
+   // modeInput.style.display = 'none';
+    modeCell.appendChild(modeInput);
+
+    modeRow.appendChild(modeCell);
+    tbody.appendChild(modeRow);
+    // --- End Mode Row ---
+
+    // Add a new row with iframes
+// Add a new row with two iframes: field 1 and field 2 plots side by side
+const iframeRow = document.createElement('tr');
+const td1 = document.createElement('td');
+const td2 = document.createElement('td');
+
+// Field 1 plot
+const iframe1 = document.createElement('iframe');
+const buildURL1 = `https://thingspeak.com/channels/${channel.dchan}/charts/1?bgcolor=%23ffffff&color=%23F18025&days=13&dynamic=true&type=line&height=200`;
+iframe1.src = buildURL1;
+iframe1.width = '100%';
+iframe1.height = '200';
+td1.appendChild(iframe1);
+
+// Field 2 plot
+const iframe2 = document.createElement('iframe');
+const buildURL2 = `https://thingspeak.com/channels/${channel.dchan}/charts/2?bgcolor=%23ffffff&color=%23007ad9&days=13&dynamic=true&type=line&height=200`;
+iframe2.src = buildURL2;
+iframe2.width = '100%';
+iframe2.height = '200';
+td2.appendChild(iframe2);
+
+// Set colspan so both iframes fill the row (adjust as needed for your table)
+td1.setAttribute('colspan', 3);
+td2.setAttribute('colspan', 3);
+
+const td3 = document.createElement('td');
+td3.setAttribute('colspan', 1); // To fill the 7th column (3+3+1=7)
+td3.style.verticalAlign = 'top';
+td3.style.padding = '5px';
+
+const dchanStatusDiv = document.createElement('div');
+dchanStatusDiv.innerHTML = `<strong>Data Channel Status:</strong><br><span id="channel_${channel.id}_dchan_status">Loading...</span>`;
+td3.appendChild(dchanStatusDiv);
+
+const dchanCreatedAtDiv = document.createElement('div');
+dchanCreatedAtDiv.style.marginTop = '8px';
+dchanCreatedAtDiv.innerHTML = `<strong>Data Channel Last Update:</strong><br><span id="channel_${channel.id}_dchan_created_at">Loading...</span>`;
+td3.appendChild(dchanCreatedAtDiv);
+
+iframeRow.appendChild(td1);
+iframeRow.appendChild(td2);
+iframeRow.appendChild(td3);
+
+tbody.appendChild(iframeRow);
+
+
+    table.appendChild(tbody);
+
+    const readButton = document.createElement('button');
+    readButton.textContent = 'Read Channel';
+    readButton.onclick = () => readChannel(channel);
+
+    const writeButton = document.createElement('button');
+    writeButton.textContent = 'Write Channel';
+    writeButton.onclick = () => writeChannel(channel);
+
+    const container = document.createElement('div');
+    container.appendChild(infoDiv); // Add info above the table
+    container.appendChild(table);
+    container.appendChild(readButton);
+
+    container.appendChild(writeButton);
+        container.appendChild(document.createElement('br')); // Add a line break    
+           container.appendChild(document.createElement('br')); // Add a line break   
+
+    return container;
+}
+
+        function updateBinaryValue(channelId) {
+            const labels = ['SleeepEn', 'PumpEn', 'NightSlp', 'LeveChk', 'BattChk'];
+            let binaryValue = 1;
+
+            labels.forEach((label, index) => {
+                const checkbox = document.getElementById(`channel_${channelId}_${label}`);
+                if (checkbox.checked) {
+                    binaryValue |= (1 << index+1); // Set the bit at the correct position
+                }
+            });
+
+            const input = document.getElementById(`channel_${channelId}_field_3`);
+            input.value = binaryValue;
+        }
+
+function readChannel(channel) {
+    fetch(`https://api.thingspeak.com/channels/${channel.id}/feeds.json?api_key=${channel.rapiKey}&results=1`)
+        .then(response => response.json())
+        .then(data => {
+                        // --- Set Channel Name ---
+            if (data.channel && data.channel.name) {
+                const nameSpan = document.getElementById(`channel_${channel.id}_name`);
+                if (nameSpan) nameSpan.textContent = data.channel.name;
+            }
+            // --- End Set Channel Name ---
+            const feeds = data.feeds[0];
+            for (let i = 1; i <= 8; i++) {
+                const inputElement = document.getElementById(`channel_${channel.id}_field_${i}`);
+                if (inputElement) {
+                    inputElement.value = feeds[`field${i}`];
+                } else {
+                    console.error(`Element with ID channel_${channel.id}_field_${i} not found`);
+                }
+            }
+            updateCheckboxes(channel.id, feeds.field3);
+
+const wakeHInput = document.getElementById(`channel_${channel.id}_wakeH`);
+const sleepHInput = document.getElementById(`channel_${channel.id}_sleepH`);
+const field4Input = document.getElementById(`channel_${channel.id}_field_4`);
+if (field4Input && wakeHInput && sleepHInput) {
+    const hours = parseInt(field4Input.value, 10);
+    if (!isNaN(hours)) {
+        wakeHInput.value = hours % 12;
+        sleepHInput.value = Math.round(hours / 12);
+    } else {
+        wakeHInput.value = '';
+        sleepHInput.value = '';
+    }
+        // Add event listeners to update field_4 when wake/sleep change
+    function updateField4() {
+        const wake = parseInt(wakeHInput.value, 10);
+        const sleep = parseInt(sleepHInput.value, 10);
+        if (
+            !isNaN(wake) && !isNaN(sleep) &&
+            wake >= 1 && wake <= 12 &&
+            sleep >= 1 && sleep <= 24
+        ) {
+            field4Input.value = (12 * (sleep - 1)) + wake;
+        }
+    }
+    wakeHInput.addEventListener('input', updateField4);
+    sleepHInput.addEventListener('input', updateField4);
+}
+
+
+
+        })
+        .catch(error => console.error('Error reading channel:', error));
+}
+
+        function updateCheckboxes(channelId, value) {
+            const labels = ['SleeepEn', 'PumpEn', 'NightSlp', 'LeveChk', 'BattChk'];
+            const binaryValue = parseInt(value, 10);
+
+            labels.forEach((label, index) => {
+                const checkbox = document.getElementById(`channel_${channelId}_${label}`);
+                checkbox.checked = (binaryValue & (2 << index)) !== 0;
+            });
+        }
+
+        function writeChannel(channel) {
+            const fields = {};
+            for (let i = 1; i <= 8; i++) {
+                fields[`field${i}`] = document.getElementById(`channel_${channel.id}_field_${i}`).value;
+            }
+
+            const url = `https://api.thingspeak.com/update?api_key=${channel.wapiKey}`;
+            const params = new URLSearchParams(fields);
+
+            fetch(url, {
+                method: 'POST',
+                body: params
+            })
+                .then(response => response.json())
+                .then(data => console.log('Channel updated:', data))
+                .catch(error => console.error('Error writing channel:', error));
+        }
+
+        function fetchDchanStatusAndCreatedAt(channel) {
+            const statusSpan = document.getElementById(`channel_${channel.id}_dchan_status`);
+            const createdAtSpan = document.getElementById(`channel_${channel.id}_dchan_created_at`);
+
+            if (!channel.dchan) {
+                if (statusSpan) statusSpan.textContent = 'N/A (no dchan)';
+                if (createdAtSpan) createdAtSpan.textContent = 'N/A';
+                return;
+            }
+
+            // Use channel.dchan for ID and main channel's rapiKey
+            const url = `https://api.thingspeak.com/channels/${channel.dchan}/feeds.json?api_key=${channel.rapiKey}&results=1&status=true`;
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status} for dchan ${channel.dchan}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.feeds && data.feeds.length > 0) {
+                        const latestFeed = data.feeds[0];
+                        if (statusSpan) {
+                            statusSpan.textContent = latestFeed.status !== undefined ? latestFeed.status : 'N/A';
+                        }
+                        if (createdAtSpan) {
+                            createdAtSpan.textContent = latestFeed.created_at ? new Date(latestFeed.created_at).toLocaleString() : 'N/A';
+                        }
+                    } else {
+                        if (statusSpan) statusSpan.textContent = 'No data';
+                        if (createdAtSpan) createdAtSpan.textContent = 'No data';
+                    }
+                })
+                .catch(error => {
+                    console.error(`Error reading dchan (${channel.dchan}) status/timestamp:`, error);
+                    if (statusSpan) statusSpan.textContent = 'Error';
+                    if (createdAtSpan) createdAtSpan.textContent = 'Error';
+                });
+        }
+
+        function init() {
+            const channelsContainer = document.getElementById('channels');
+            channels.forEach(channel => {
+                const table = createTable(channel);
+                channelsContainer.appendChild(table);
+                readChannel(channel); // Call readChannel for each channel on page load
+                fetchDchanStatusAndCreatedAt(channel); // Fetch and display dchan status and created_at
+            });
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
