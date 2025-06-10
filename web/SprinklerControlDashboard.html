@@ -41,6 +41,8 @@ function createTable(channel) {
         <strong>Channel ID:</strong> <span id="channel_${channel.id}_id">${channel.id}</span>
         &nbsp;&nbsp;
         <strong>Channel Name:</strong> <span id="channel_${channel.id}_name">Loading...</span>
+        &nbsp;&nbsp;
+        <strong>Data Channel ID:</strong> <span id="channel_${channel.id}_dchan_id">${channel.dchan}</span>
     `;
 
     const table = document.createElement('table');
