@@ -1,11 +1,11 @@
 #include <WiFi.h>
-#include "ThingSpeak.h"
 #include <ArduinoJson.h>
 #include <Time.h>
 #include <TimeLib.h>
 #include "EEPROM.h"
 #include <ESP32Servo.h>
-//#include <analogWrite.h>
+#include <analogWrite.h>
+#include "ThingSpeak.h"
 
 //#define DEVICE1
 #define DEVICE2
@@ -74,6 +74,8 @@ bool eepromChanged = false;
 // Network information
 char * ssid = "still_waters";
 const char * password = "33turkeys511";
+long timeReadChannelId = 444067;
+const char *timeReadAPIKey = "NBU9ULD2EJ1ELM9T";  //time control channel
 
 // ThingSpeak settings
 char server[] = "api.thingspeak.com";
@@ -130,15 +132,7 @@ int intCounter = 0;
 
 WiFiClient client;
 
-//interrupt for servo button 
-void IRAM_ATTR servoInterrupt() {
-  if ((millis() - lastTrigger) > 400) {
-    servoFlag = 1;
-    intCounter++;
-    Serial.println("Interrupt!");
-    lastTrigger = millis();
-  }
-}
+
 
 void setup() {
 
@@ -211,6 +205,7 @@ void loop() {
   Serial.println("Connected bool" + String(connectedBool));
 
   if (connectedBool) {
+        Serial.println(readTSPTime());
     readTSP();
   }
 
@@ -230,12 +225,12 @@ void loop() {
     moveServo();
     servoFlag = 0;
   }
-
+//what if the time read failed
   if ((online.selectMode & (1 << 3)) and(connectedBool)) { //can't check time if we arent connected
     Serial.println("Time Check");
     //do stuff based on time
     if (hour() < wakeHour) {
-      openServo();
+     // openServo();
       delay(100);
     }
     if (hour() > sleepHour) {
@@ -245,6 +240,26 @@ void loop() {
     if ((hour() > sleepHour) or(hour() < wakeHour)) {
 
       online.waterTime = 0; //dont water at night
+ // calculate the sleep time 
+ // if the hour is greater than sleep hour then sleep for four hours
+ // if the hour is less than wake hour then sleep for one hours
+      if (hour() > sleepHour) {
+        Serial.println("off work hours");
+        long sleepTime = 21600; //6 hours
+        Serial.println("Sleep for every " + String(sleepTime) + " Seconds");
+      } else {
+        //if we are before wake hour then sleep for one hour
+        Serial.println("before work hours");
+        long sleepTime = 3600; //1 hour
+        
+        Serial.println("Sleep for every " + String(sleepTime) + " Seconds");
+      }
+      esp_sleep_enable_timer_wakeup(sleepTime * 1000000 ULL);
+
+      Serial.flush();
+      esp_deep_sleep_start();
+    } else {
+      
       long sleepTime = 14400;
       Serial.println("off work hours");
       esp_sleep_enable_timer_wakeup(sleepTime * 1000000 );
@@ -296,7 +311,7 @@ void loop() {
       EEPROMWriteAll();
      
     }
-    esp_sleep_enable_timer_wakeup(online.sleepTime * 1000000);
+    esp_sleep_enable_timer_wakeup(online.sleepTime * 1000000 );
 
     Serial.println("Setup ESP8266 to sleep for every " + String(online.sleepTime) +
       " Seconds");
@@ -381,7 +396,7 @@ void httpRequest(long field1Data, int field2Data, int field3Data, int field4Data
     //get the time out of the response
     // Serial.println("here is the short part "+ answer.substring(STRSTART, STRLEN));
     //send to json parser to get time
-    parseTime(answer.substring(STRSTART, STRLEN));
+    //parseTime(answer.substring(STRSTART, STRLEN));
 
   }
   client.stop();
@@ -469,16 +484,7 @@ int getAnalog(int pin) {
 int parseTime(String input) {
   Serial.println("time input is ");
   Serial.println(input);
-  // char jsonObject[1024];
-  //StaticJsonBuffer<512> jsonBuffer;
 
-  //JsonObject& root=jsonBuffer.parseObject(input);
-  //if (!root.success()) {
-  //Serial.println( "parseObject() failed");
-  //return 0;
-  // }
-  //timeSub= root["created_at"];
-  //String timeString=String(timeSub);
   char charMonth[4];
   long timeYear = input.substring(19, 23).toInt();
   String strMonth = input.substring(15, 17);
@@ -500,95 +506,7 @@ int parseTime(String input) {
   Serial.println("time is " + String(hour()) + ":" + String(minute()) + ":" + String(second()) + "," + " " + String(month()) + " " + String(day()) + " " + String(year()));
 
 }
-/*
-int getLaser(){
-    VL53L0X_RangingMeasurementData_t measure;
-    digitalWrite (LASER_SHDWN, HIGH);
-    // delay(100);
-    if (!lox.begin()) {
-        Serial.println(F("Failed to boot VL53L0X"));
-        return 0;
-    }
-   
-    delay(1000);
-    Serial.print("Reading a measurement... ");
-    lox.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
-   
-    if (measure.RangeStatus != 4) { // phase failures have incorrect data
-        int myDistance = measure.RangeMilliMeter; digitalWrite (LASER_SHDWN, LOW);
-        if (myDistance>LASER_MAX){
-            myDistance=LASER_MAX;
-        }
-        Serial.print("Distance (mm): "); Serial.println(myDistance);
-        return myDistance;
-        } else {
-        Serial.println(" out of range ");
-        digitalWrite (LASER_SHDWN, LOW);
-        return 0;
-    }
-}
-*/
 
-void runPondFillTest() {
-  Serial.println("Fill Test");
-  digitalWrite(FILL_SERVO_CLOSE, LOW);
-  digitalWrite(FILL_SERVO_OPEN, HIGH);
-  delay(2000);
-  digitalWrite(FILL_SERVO_CLOSE, HIGH);
-  digitalWrite(FILL_SERVO_OPEN, LOW);
-  delay(2000);
-  digitalWrite(FILL_SERVO_CLOSE, LOW);
-  digitalWrite(FILL_SERVO_OPEN, HIGH);
-  delay(2000);
-  digitalWrite(FILL_SERVO_CLOSE, HIGH);
-  digitalWrite(FILL_SERVO_OPEN, LOW);
-  delay(2000);
-}
-
-void runPondEmptyTest() {
-  Serial.println("empty now");
-  statusMessage += " empty test";
-  digitalWrite(EMPTY_PUMP_PIN, HIGH);
-  Serial.println("Empty pump High");
-  delay(2000);
-  digitalWrite(EMPTY_PUMP_PIN, LOW);
-  Serial.println("Empty pump low");
-  delay(2000);
-  digitalWrite(EMPTY_PUMP_PIN, HIGH);
-  Serial.println("Empty pump High");
-  delay(2000);
-  digitalWrite(EMPTY_PUMP_PIN, LOW);
-  Serial.println("Empty pump low");
-  delay(2000);
-
-}
-
-int getUltraDist(int trig, int echo) {
-  float distance = 0;
-  float sumDistance = 0;
-  int n = 5;
-  for (int i = 0; i < n; i++) {
-
-    digitalWrite(trig, LOW); // Set the trigger pin to low for 2uS
-    delayMicroseconds(2);
-
-    digitalWrite(trig, HIGH); // Send a 10uS high to trigger ranging
-    delayMicroseconds(20);
-
-    digitalWrite(trig, LOW); // Send pin low again
-    int distance = pulseIn(echo, HIGH, 26000); // Read in times pulse
-
-    distance = distance / 58; //Convert the pulse duration to distance
-    //You can add other math functions to calibrate it well
-
-    Serial.print("Distance ");
-    Serial.print(distance);
-    Serial.println("cm");
-    sumDistance = sumDistance + distance / float(n);
-  }
-
-  return sumDistance;
-}
 
 void readEEPROM() {
   memory.waterTime = (EEPROM.read(WATER_ADDRESS) << 8) + EEPROM.read(WATER_ADDRESS + 1);
@@ -609,6 +527,8 @@ void readEEPROM() {
 }
 
 void readTSP() {
+  //read the control channel
+  //
 
   int statusCode = ThingSpeak.readMultipleFields(readChannelId, readAPIKey);
 
@@ -654,50 +574,9 @@ void readTSP() {
   // Serial.println("fill mem " +String(online.fillPondHour));
 }
 
-void openServo() {
-  Serial.println(" Open servo ");
-  int pos;
-  digitalWrite(SERVO_ENABLE, HIGH);
-  delay(200);
-  for (pos = CLOSE_POS; pos <= OPEN_POS; pos += 1) { // goes from 0 degrees to 180 degrees
-    // in steps of 1 degree
-    myservo.write(pos); // tell servo to go to position in variable 'pos'
-    delay(50); // waits 15ms for the servo to reach the position
-  }
 
-  digitalWrite(SERVO_ENABLE, LOW);
-  delay(200);
-  servoPosition = 1;
 
-}
 
-void closeServo() {
-  Serial.println(" Close servo");
-  int pos;
-  digitalWrite(SERVO_ENABLE, HIGH);
-  delay(200);
-
-  for (pos = OPEN_POS; pos >= CLOSE_POS; pos -= 1) { // goes from 180 degrees to 0 degrees
-    myservo.write(pos); // tell servo to go to position in variable 'pos'
-    delay(50); // waits 15ms for the servo to reach the position
-  }
-  digitalWrite(SERVO_ENABLE, LOW);
-  delay(200);
-
-  servoPosition = 0;
-}
-
-void moveServo() {
-  if (intCounter % 2 == 1) {
-    blinkX(10, 100);
-    openServo();
-  } else {
-    blinkX(2, 600);
-    closeServo();
-
-  }
-  servoFlag = 0;
-}
 
 void EEPROMWriteAll(){
  Serial.println("Writing EEPROM");
@@ -714,4 +593,37 @@ void EEPROMWriteAll(){
       EEPROM.write(LEVEL_ADDRESS, online.levelMin >> 8);
       EEPROM.write(LEVEL_ADDRESS + 1, online.levelMin & 0xFF);
       EEPROM.commit();
+}
+
+String readTSPTime() {
+
+  //assume we are already connected
+  int statusCode = ThingSpeak.readMultipleFields(timeReadChannelId, timeReadAPIKey);
+  if (statusCode == 200) {
+    int myYear = ThingSpeak.getFieldAsInt(1);
+    int myMonth = ThingSpeak.getFieldAsInt(2);
+    int myDay = ThingSpeak.getFieldAsInt(3);
+    int myHour = ThingSpeak.getFieldAsInt(4);
+    int myMin = ThingSpeak.getFieldAsInt(5);
+    int mySecond = ThingSpeak.getFieldAsInt(6);
+    String currentTime = ThingSpeak.getCreatedAt();
+
+    setTime(myHour, myMin, mySecond, myDay, myMonth, myYear);
+
+    String timeString = String(myYear) + String("-") + String(myMonth) + "-" + String(myDay) + " " + String(myHour) + ":" + String(myMin) + ":" + String(mySecond);
+
+    return timeString;
+  }
+  return ("time Failed");
+}
+
+int32_t getWiFiChannel(const char *ssid) {
+  if (int32_t n = WiFi.scanNetworks()) {
+    for (uint8_t i = 0; i < n; i++) {
+      if (!strcmp(ssid, WiFi.SSID(i).c_str())) {
+        return WiFi.channel(i);
+      }
+    }
+  }
+  return 0;
 }
