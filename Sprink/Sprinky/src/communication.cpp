@@ -8,6 +8,8 @@
 #include <TimeLib.h>
 #include "ThingSpeak.h"
 
+unsigned long lastConnectionTime = 0;
+
 void connectWiFi() {
   int tryCounter = 0;  
   Serial.println("Connecting to WiFi...");
@@ -25,13 +27,13 @@ void connectWiFi() {
 
   // More patient retry loop. Tries for 30 seconds (60 * 500ms).
   while (WiFi.status() != WL_CONNECTED) {
-    if (tryCounter >= 60) {
+    if (tryCounter >= 6) {
       Serial.println("\nFailed to connect to WiFi.");
       connectedBool = false;
       online = memory; // Fallback to EEPROM values if connection fails
       return;
     }
-    delay(500);
+    delay( WIFI_RETRY_SLEEP_S );
     Serial.print(".");
     tryCounter++;
   }
@@ -88,7 +90,11 @@ void readTSP() {
 
 String readTSPTime() {
   //assume we are already connected
+  // The default ThingSpeak timeout is 5000ms. We'll increase it to our custom value.
+ 
   int statusCode = ThingSpeak.readMultipleFields(timeReadChannelId, timeReadAPIKey);
+
+
   if (statusCode == 200) {
     int myYear = ThingSpeak.getFieldAsInt(1);
     int myMonth = ThingSpeak.getFieldAsInt(2);
@@ -120,16 +126,20 @@ int32_t getWiFiChannel(const char *ssid) {
 
 
 void httpRequest(long field1Data, int field2Data, int field3Data, int field4Data, String status) {
-  if (!client.connect(server, 80)) {
+ if (!client.connect(server, 80)) {
+
     Serial.println("Connection failed");
+    lastConnectionTime = millis();
     client.stop();
     return;
   } else {
+
     // Create data string to send to ThingSpeak.
-    String data = "field1=" + String(field1Data) + "&field2=" + String(field2Data) + "&field3=" + String(field3Data) + "&field4=" + String(field4Data) + "&status=" + status +  ".json"; //shows how to include additional field data in http post
+    String data = "field1=" + String(field1Data) + "&field2=" + String(field2Data) + "&field3=" + String(field3Data) + "&field4=" + String(field4Data) + "&status=" + status + ".json"; //shows how to include additional field data in http post
 
     // POST data to ThingSpeak.
     if (client.connect(server, 80)) {
+
       client.println("POST /update HTTP/1.1");
       client.println("Host: api.thingspeak.com");
       client.println("Connection: close");
@@ -140,14 +150,23 @@ void httpRequest(long field1Data, int field2Data, int field3Data, int field4Data
       client.print(data.length());
       client.print("\n\n");
       client.print(data);
+
+      // Serial.println("RSSI = " + String(field1Data));
+      lastConnectionTime = millis();
     }
-    getResponse();
+    //getCall();
+    String answer = getResponse();
+    // Serial.println("here is the answer" + answer );
+    //get the time out of the response
+    // Serial.println("here is the short part "+ answer.substring(STRSTART, STRLEN));
+    //send to json parser to get time
+    //parseTime(answer.substring(STRSTART, STRLEN));
+
   }
   client.stop();
+
 }
 
-// Wait for a response from the server indicating availability,
-// and then collect the response and build it into a string.
 String getResponse() {
   String response;
   long startTime = millis();
@@ -168,3 +187,4 @@ String getResponse() {
 
   return response;
 }
+

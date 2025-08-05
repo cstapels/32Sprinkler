@@ -6,6 +6,7 @@
 #define LEVEL_CONTROL_PIN 33
 #define PUMP_PIN 27
 #define TIME_TO_SLEEP 3600
+#define WIFI_RETRY_SLEEP_S 600 // 10 minutes (in seconds) for sleep on WiFi connection failure
 #define STRSTART 17
 #define STRLEN 54
 #define TRIG 23
@@ -26,4 +27,3 @@
 #define LEVEL_SENSE_LOW 13
 #define LEVEL_SENSE_HIGH 12
 #define numberPoints 3
-
