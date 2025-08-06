@@ -25,7 +25,7 @@ void connectWiFi() {
 
   WiFi.begin(ssid, password);
 
-  // More patient retry loop. Tries for 30 seconds (60 * 500ms).
+ 
   while (WiFi.status() != WL_CONNECTED) {
     if (tryCounter >= 6) {
       Serial.println("\nFailed to connect to WiFi.");
