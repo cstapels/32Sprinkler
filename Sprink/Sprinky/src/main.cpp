@@ -31,7 +31,6 @@ const char *timeReadAPIKey = "NBU9ULD2EJ1ELM9T"; // time control channel
 char server[] = "api.thingspeak.com";
 WiFiClient client;
 
-bool connectOnWake = 1;
 
 // #define DEVICE1
 #define DEVICE2
@@ -73,6 +72,7 @@ long myChannelNumber = 1160823;               // channel 4
 const char *readAPIKey = "CN409WRNXUVJYKGQ";  // Ducktank control channel
 long readChannelId = 1160824;                 // channel2
 #endif
+
 
 // prototypes
 int getTimeStatus();
@@ -116,7 +116,8 @@ void setup()
 // 2 pump enable
 // 3 overnight sleep
 // 4 level check
-// 5 battery level check
+// 5 battery check
+
 
 void loop()
 {
@@ -142,6 +143,23 @@ void loop()
   if (connectedBool)
   {
     String theTime = readTSPTime();
+    if (theTime == "time Failed")
+    {
+      theTime = "Failed to get time";
+      delay(1000);
+      // try again
+      String theTime = readTSPTime();
+      statusMessage += statusMessage + " Time Failed";
+    }
+
+     if (theTime == "time Failed")
+    {
+      connectedBool = false;
+      int timeStatus = 3;
+
+    }
+
+
     Serial.println(theTime);
     Serial.println("hour is " + String(hour()) + " minute is " + String(minute()));
     statusMessage += theTime + " ";
@@ -154,6 +172,8 @@ void loop()
   int lowState = digitalRead(LEVEL_SENSE_LOW); //water level sensors
   int highState = digitalRead(LEVEL_SENSE_HIGH);
   int waterLevel = lowState + 10 * highState; // change to read cap
+//print the level states
+  Serial.println("Water level is " + String(waterLevel));
 
   if ((online.selectMode & (1 << 3)) and (connectedBool))
   { // can't check time if we arent connected
@@ -192,6 +212,10 @@ void loop()
 
   esp_sleep_enable_timer_wakeup(500 * 1000000); // try again in ten minutes
   Serial.println("Going to sleep now to wait for better wifi");
+  Serial.flush();
+  esp_deep_sleep_start();
+
+
   Serial.flush();
   esp_deep_sleep_start();
 

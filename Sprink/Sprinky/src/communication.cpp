@@ -33,8 +33,9 @@ void connectWiFi() {
       online = memory; // Fallback to EEPROM values if connection fails
       return;
     }
-    delay( WIFI_RETRY_SLEEP_S );
+    delay( WIFI_RETRY_SLEEP_S *1000);
     Serial.print(".");
+    blinkX(1, 100);
     tryCounter++;
   }
   Serial.println("\nConnected to WiFi!");

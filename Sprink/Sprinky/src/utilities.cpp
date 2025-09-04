@@ -161,6 +161,10 @@ void getReadyToSleep(int statusCode)
   { // after work hours
     sleepTime = 3600 * 6;
   }
+    if (statusCode == 3)  //time chack failed
+  { // after work hours
+    sleepTime = 300;
+  }
 
   if (online.selectMode & 1) // if sleep mode is enabled
   {
@@ -189,6 +193,7 @@ int getTimeStatus()
   // 0 = before work hours
   // 1 = work hours
   // 2 = after work hours
+//  3 time fail, sleep for a little while
   if (hour() < wakeHour)
   {
     Serial.println("before work hours");

@@ -6,7 +6,7 @@
 #define LEVEL_CONTROL_PIN 33
 #define PUMP_PIN 27
 #define TIME_TO_SLEEP 3600
-#define WIFI_RETRY_SLEEP_S 30 // 30 seconds
+#define WIFI_RETRY_SLEEP_S 8 // 30 seconds
 #define STRSTART 17
 #define STRLEN 54
 #define TRIG 23
