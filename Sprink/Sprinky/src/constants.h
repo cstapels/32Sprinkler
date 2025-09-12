@@ -1,0 +1,29 @@
+#define buttonPin 0
+#define LEDPin 2
+#define TIMEOUT 5000
+#define BATT_PIN 35 //Changed on accident!! reset for next program
+#define LEVEL_PIN 34
+#define LEVEL_CONTROL_PIN 33
+#define PUMP_PIN 27
+#define TIME_TO_SLEEP 3600
+#define WIFI_RETRY_SLEEP_S 8 // 30 seconds
+#define STRSTART 17
+#define STRLEN 54
+#define TRIG 23
+#define ECHO 4
+#define DRAIN_PUMP 14
+#define EMPTY_PUMP_PIN 14
+#define FILL_SERVO_OPEN 17
+#define FILL_SERVO_CLOSE 16
+#define WATER_ADDRESS 2
+#define SLEEP_ADDRESS 4
+#define MODE_ADDRESS 6
+#define FILL_TIME_ADDRESS 8
+#define CONNECT_ON_WAKE_ADDRESS 10
+#define BATTERY_ADDRESS 12
+#define LEVEL_ADDRESS 14
+#define PUMP2_TIME_ADDRESS 16
+#define SERVO_BUTTON_PIN 19
+#define LEVEL_SENSE_LOW 13
+#define LEVEL_SENSE_HIGH 12
+#define numberPoints 3
