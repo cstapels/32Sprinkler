@@ -27,3 +27,4 @@
 #define LEVEL_SENSE_LOW 13
 #define LEVEL_SENSE_HIGH 12
 #define numberPoints 3
+#define LEVEL_POWER 14

@@ -171,7 +171,12 @@ void loop()
   int batteryLevel = getAnalog(BATT_PIN);
   int lowState = digitalRead(LEVEL_SENSE_LOW); //water level sensors
   int highState = digitalRead(LEVEL_SENSE_HIGH);
-  int waterLevel = lowState + 10 * highState; // change to read cap
+  digitalWrite(LEVEL_POWER,HIGH);
+  delay(10);
+  int waterLevel = lowState + 10 * highState;
+  digitalWrite(LEVEL_POWER,LOW);
+  
+  
 //print the level states
   Serial.println("Water level is " + String(waterLevel));
 
