@@ -14,8 +14,6 @@ struct controlData memory;
 struct controlData online;
 int timeOffset = 4;
 
-
-
 bool connectedBool = false;
 String statusMessage = "";
 bool eepromChanged = false;
@@ -170,7 +168,9 @@ void loop()
   Serial.println(wifiStrength);
   int batteryLevel = getAnalog(BATT_PIN);
   int lowState = digitalRead(LEVEL_SENSE_LOW); //water level sensors
+    Serial.println("low level is " + String(lowState));
   int highState = digitalRead(LEVEL_SENSE_HIGH);
+    Serial.println("high level is " + String(highState));
   digitalWrite(LEVEL_POWER,HIGH);
   delay(10);
   int waterLevel = lowState + 10 * highState;
@@ -199,7 +199,7 @@ void loop()
     // now write the values
     if (connectedBool)
     {
-      httpRequest(batteryLevel, waterLevel, wifiStrength, 10, statusMessage);
+      httpRequest(batteryLevel, waterLevel, wifiStrength, 56, statusMessage);
     }
 
     getReadyToSleep(timeStatus);

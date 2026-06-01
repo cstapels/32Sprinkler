@@ -174,7 +174,7 @@ void getReadyToSleep(int statusCode)
       EEPROMWriteAll();
     }
 
-    esp_sleep_enable_timer_wakeup(sleepTime * 1000000);
+    esp_sleep_enable_timer_wakeup((uint64_t)sleepTime * 1000000);
 
     Serial.println("Setup ESP8266 to sleep for every " + String(sleepTime) +
                    " Seconds");
