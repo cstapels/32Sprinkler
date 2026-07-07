@@ -10,10 +10,13 @@
 
 extern String statusMessage;
 
-int sleepHour = 19;
-int wakeHour = 4;
-int batteryMin = -1;
-int levelMin = 150;
+
+
+
+
+//int batteryMin = -1;
+//
+
 
 // Make the LED blink a variable number of times with a variable delay.
 void blinkX(int numTimes, int delayTime) {
@@ -100,6 +103,7 @@ void EEPROMWriteAll(){
 
 int getPumpStatus(int batteryLevel, int waterLevel)
 {
+  int levelMin = online.levelMin; //may have to decide what to do if not online
   // 0 dont pump
   // 1 pump
   int pumpStatus = 0;
@@ -188,6 +192,8 @@ void getReadyToSleep(int statusCode)
 
 int getTimeStatus()
 {
+  int wakeHour = online.fillPondHour % 12 ; //24 hour clock
+int sleepHour  = floor(online.fillPondHour / 12)+13; // wake hour is the fill pond hour mod 12
 
   // check the time and return a status
   // 0 = before work hours
@@ -196,16 +202,17 @@ int getTimeStatus()
 //  3 time fail, sleep for a little while
   if (hour() < wakeHour)
   {
-    Serial.println("before work hours");
+    Serial.println("before work hours "+ String(hour())+ " wake hour "+ String(wakeHour));
     return 0; // before work hours
   }
 
   if ((hour() > sleepHour))
   {
-    Serial.println("after work hours");
+    Serial.println("after work hours "+String(hour())+ " wake hour "+ String(wakeHour));
     return 2; // after work hours
   }
 
-  Serial.println("work hours");
+  Serial.println(" work hours "+String(hour())+ " wake hour "+ String(wakeHour)+ " variable "+ String(online.fillPondHour)) ;
+ // Serial.println("work hours");
   return 1; // work hours
 }

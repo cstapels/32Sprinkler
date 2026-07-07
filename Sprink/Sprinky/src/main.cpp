@@ -32,7 +32,7 @@ WiFiClient client;
 
 // #define DEVICE1
 #define DEVICE2
-// #define DEVICE3
+ //#define DEVICE3
 // #define DEVICE4
 // #define DEVICEDUCK
 
