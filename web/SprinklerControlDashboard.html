@@ -16,11 +16,44 @@
             padding: 8px;
             text-align: left;
         }
+        #valveSection {
+            margin-top: 24px;
+            padding-top: 12px;
+            border-top: 3px solid black;
+        }
+        #valveSection table {
+            width: 500px;
+        }
+        .valve-schedule-table {
+            width: 500px;
+            margin-bottom: 10px;
+        }
+        .valve-schedule-table input {
+            width: 70px;
+        }
+        .valve-write-btn {
+            background-color: #2e7d32;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin-right: 8px;
+            cursor: pointer;
+        }
+        .valve-add-row-btn, .valve-remove-row-btn {
+            padding: 4px 10px;
+            margin-right: 8px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <h1>ThingSpeak Channels</h1>
     <div id="channels"></div>
+
+    <div id="valveSection">
+        <h2>Valve Control</h2>
+        <div id="valveControls"></div>
+    </div>
 
     <script>
         const channels = [
@@ -31,6 +64,21 @@
             { id: '1160824', wapiKey: 'EJ2Z4MOV2LQAEVCQ', rapiKey: 'CN409WRNXUVJYKGQ', dchan: '1160823' }
         ];
         const fieldLabel = ['Water On', 'Sleep T', 'Mode', 'Hours', 'Bat Min', 'LevelMin', 'WakeCon', 'Extra'];
+
+        // The control channel (3424859) is the single source of truth for
+        // valve commands: the web page writes the schedule to it with
+        // writeAPIKey and reads it back with readAPIKey. Channel 3424858 is
+        // a separate chart-only channel and is not used for control.
+        const valveChannels = [
+            {
+                name: 'Valve 1',
+                channelId: 3424859,
+                writeAPIKey: 'THMRWASP7AYHD4QM',
+                readAPIKey: 'THMRWASP7AYHD4QM',
+                chartChannelId: 3424858,
+                chartAPIKey: '7VZM9LSAM0LVHZI7'
+            }
+        ];
 
         
 function createTable(channel) {
@@ -359,6 +407,245 @@ if (field4Input && wakeHInput && sleepHInput) {
                 });
         }
 
+        // ===================== Valve Control Section =====================
+        // field1: valve order, one digit per valve, e.g. "1234" (order can
+        //         be shuffled, e.g. "4213")
+        // field2: start times, one HHmm (4-digit, 24hr) per valve, colon
+        //         separated, e.g. "0600:0730:0900:1015"
+        // field3: mode, a plain integer (not a bitmask)
+        // field4: durations in minutes, one 3-digit mmm per valve, colon
+        //         separated, e.g. "030:045:060:090"
+        // The Nth valve number in field1 lines up with the Nth start time
+        // in field2 and the Nth duration in field4.
+
+        function padTime(value) {
+            // "6:00" -> "0600"
+            const digits = value.replace(':', '');
+            return digits.padStart(4, '0');
+        }
+
+        function timeDigitsToInputValue(digits) {
+            // "0600" -> "06:00" for an <input type="time">
+            if (!digits || digits.length < 4) return '';
+            return `${digits.slice(0, 2)}:${digits.slice(2, 4)}`;
+        }
+
+        function padDuration(value) {
+            const digits = String(parseInt(value, 10) || 0);
+            return digits.padStart(3, '0');
+        }
+
+        function addValveRow(tbody, valveNumber, startTimeDigits, durationDigits) {
+            const row = document.createElement('tr');
+
+            const valveTd = document.createElement('td');
+            const valveInput = document.createElement('input');
+            valveInput.type = 'text';
+            valveInput.maxLength = 1;
+            valveInput.value = valveNumber || '';
+            valveTd.appendChild(valveInput);
+            row.appendChild(valveTd);
+
+            const startTd = document.createElement('td');
+            const startInput = document.createElement('input');
+            startInput.type = 'time';
+            startInput.value = timeDigitsToInputValue(startTimeDigits);
+            startTd.appendChild(startInput);
+            row.appendChild(startTd);
+
+            const durationTd = document.createElement('td');
+            const durationInput = document.createElement('input');
+            durationInput.type = 'number';
+            durationInput.min = '0';
+            durationInput.max = '999';
+            durationInput.value = durationDigits ? parseInt(durationDigits, 10) : '';
+            durationTd.appendChild(durationInput);
+            durationTd.appendChild(document.createTextNode(' min'));
+            row.appendChild(durationTd);
+
+            const removeTd = document.createElement('td');
+            const removeButton = document.createElement('button');
+            removeButton.textContent = 'Remove';
+            removeButton.className = 'valve-remove-row-btn';
+            removeButton.onclick = () => row.remove();
+            removeTd.appendChild(removeButton);
+            row.appendChild(removeTd);
+
+            row.dataset.valveInput = '';
+            row._inputs = { valveInput, startInput, durationInput };
+            tbody.appendChild(row);
+            return row;
+        }
+
+        function createValvePanel(valve) {
+            const container = document.createElement('div');
+            container.style.marginBottom = '16px';
+
+            const infoDiv = document.createElement('div');
+            infoDiv.style.marginBottom = '8px';
+            infoDiv.innerHTML = `<strong>${valve.name}</strong> &nbsp;&nbsp; <strong>Last Update:</strong> <span id="valve_${valve.channelId}_updated">Loading...</span>`;
+            container.appendChild(infoDiv);
+
+            const modeDiv = document.createElement('div');
+            modeDiv.style.marginBottom = '8px';
+            const modeLabel = document.createElement('label');
+            modeLabel.textContent = 'Mode: ';
+            modeLabel.htmlFor = `valve_${valve.channelId}_mode`;
+            const modeInput = document.createElement('input');
+            modeInput.type = 'number';
+            modeInput.id = `valve_${valve.channelId}_mode`;
+            modeInput.style.width = '60px';
+            modeDiv.appendChild(modeLabel);
+            modeDiv.appendChild(modeInput);
+            container.appendChild(modeDiv);
+
+            const table = document.createElement('table');
+            table.className = 'valve-schedule-table';
+            table.id = `valve_${valve.channelId}_table`;
+
+            const headerRow = document.createElement('tr');
+            ['Valve #', 'Start Time', 'Duration', ''].forEach(text => {
+                const th = document.createElement('th');
+                th.textContent = text;
+                headerRow.appendChild(th);
+            });
+            table.appendChild(headerRow);
+
+            const tbody = document.createElement('tbody');
+            tbody.id = `valve_${valve.channelId}_tbody`;
+            table.appendChild(tbody);
+            container.appendChild(table);
+
+            const addRowButton = document.createElement('button');
+            addRowButton.textContent = 'Add Valve';
+            addRowButton.className = 'valve-add-row-btn';
+            addRowButton.onclick = () => addValveRow(tbody);
+            container.appendChild(addRowButton);
+
+            const readButton = document.createElement('button');
+            readButton.textContent = 'Read Schedule';
+            readButton.onclick = () => readValve(valve);
+            container.appendChild(readButton);
+
+            const writeButton = document.createElement('button');
+            writeButton.textContent = 'Write Schedule';
+            writeButton.className = 'valve-write-btn';
+            writeButton.onclick = () => writeValve(valve);
+            container.appendChild(writeButton);
+
+            if (valve.chartChannelId) {
+                const chartRow = document.createElement('div');
+                chartRow.style.display = 'flex';
+                chartRow.style.gap = '8px';
+                chartRow.style.marginTop = '12px';
+                chartRow.style.maxWidth = '900px';
+
+                const chart1 = document.createElement('iframe');
+                chart1.src = `https://api.thingspeak.com/channels/${valve.chartChannelId}/charts/1?bgcolor=%23ffffff&color=%23F18025&days=13&dynamic=true&type=line&height=200&api_key=${valve.chartAPIKey}`;
+                chart1.style.flex = '1';
+                chart1.height = '200';
+
+                const chart2 = document.createElement('iframe');
+                chart2.src = `https://api.thingspeak.com/channels/${valve.chartChannelId}/charts/2?bgcolor=%23ffffff&color=%23007ad9&days=13&dynamic=true&type=line&height=200&api_key=${valve.chartAPIKey}`;
+                chart2.style.flex = '1';
+                chart2.height = '200';
+
+                chartRow.appendChild(chart1);
+                chartRow.appendChild(chart2);
+                container.appendChild(chartRow);
+            }
+
+            return container;
+        }
+
+        function writeValve(valve) {
+            const tbody = document.getElementById(`valve_${valve.channelId}_tbody`);
+            const modeInput = document.getElementById(`valve_${valve.channelId}_mode`);
+
+            const valveNumbers = [];
+            const startTimes = [];
+            const durations = [];
+
+            Array.from(tbody.rows).forEach(row => {
+                const { valveInput, startInput, durationInput } = row._inputs;
+                if (!valveInput.value) return;
+                valveNumbers.push(valveInput.value.trim());
+                startTimes.push(padTime(startInput.value || '0000'));
+                durations.push(padDuration(durationInput.value));
+            });
+
+            const fields = {
+                field1: valveNumbers.join(''),
+                field2: startTimes.join(':'),
+                field3: modeInput.value || '0',
+                field4: durations.join(':')
+            };
+
+            const url = `https://api.thingspeak.com/update?api_key=${valve.writeAPIKey}`;
+            const params = new URLSearchParams(fields);
+
+            fetch(url, {
+                method: 'POST',
+                body: params
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Valve schedule updated:', data);
+                    // Give ThingSpeak a moment to propagate the write, then
+                    // refresh from the read channel to confirm.
+                    setTimeout(() => readValve(valve), 3000);
+                })
+                .catch(error => console.error('Error writing valve schedule:', error));
+        }
+
+        function readValve(valve) {
+            const updatedTd = document.getElementById(`valve_${valve.channelId}_updated`);
+            const modeInput = document.getElementById(`valve_${valve.channelId}_mode`);
+            const tbody = document.getElementById(`valve_${valve.channelId}_tbody`);
+
+            fetch(`https://api.thingspeak.com/channels/${valve.channelId}/feeds.json?api_key=${valve.readAPIKey}&results=1`)
+                .then(response => response.json())
+                .then(data => {
+                    const feeds = data.feeds && data.feeds[0];
+                    if (!feeds) {
+                        if (updatedTd) updatedTd.textContent = 'No data';
+                        return;
+                    }
+
+                    const valveNumbers = (feeds.field1 || '').split('');
+                    const startTimes = (feeds.field2 || '').split(':');
+                    const durations = (feeds.field4 || '').split(':');
+
+                    if (modeInput) modeInput.value = feeds.field3 !== null ? feeds.field3 : '';
+
+                    if (tbody) {
+                        tbody.innerHTML = '';
+                        const rowCount = Math.max(valveNumbers.length, startTimes.length, durations.length);
+                        for (let i = 0; i < rowCount; i++) {
+                            addValveRow(tbody, valveNumbers[i], startTimes[i], durations[i]);
+                        }
+                    }
+
+                    if (updatedTd) {
+                        updatedTd.textContent = feeds.created_at ? new Date(feeds.created_at).toLocaleString() : 'N/A';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error reading valve schedule:', error);
+                    if (updatedTd) updatedTd.textContent = 'Error';
+                });
+        }
+
+        function initValves() {
+            const valveContainer = document.getElementById('valveControls');
+            valveChannels.forEach(valve => {
+                const panel = createValvePanel(valve);
+                valveContainer.appendChild(panel);
+                readValve(valve);
+            });
+        }
+        // =================== End Valve Control Section ====================
+
         function init() {
             const channelsContainer = document.getElementById('channels');
             channels.forEach(channel => {
@@ -367,9 +654,10 @@ if (field4Input && wakeHInput && sleepHInput) {
                 readChannel(channel); // Call readChannel for each channel on page load
                 fetchDchanStatusAndCreatedAt(channel); // Fetch and display dchan status and created_at
             });
+            initValves();
         }
 //just a comment 
-        window.onload = init;
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
