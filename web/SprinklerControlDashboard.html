@@ -207,16 +207,18 @@ const td2 = document.createElement('td');
 
 // Field 1 plot
 const iframe1 = document.createElement('iframe');
+iframe1.src = 'about:blank';
 const buildURL1 = `https://thingspeak.com/channels/${channel.dchan}/charts/1?bgcolor=%23ffffff&color=%23F18025&days=13&dynamic=true&type=line&height=200`;
-iframe1.src = buildURL1;
+iframe1.dataset.src = buildURL1;
 iframe1.width = '100%';
 iframe1.height = '200';
 td1.appendChild(iframe1);
 
 // Field 2 plot
 const iframe2 = document.createElement('iframe');
+iframe2.src = 'about:blank';
 const buildURL2 = `https://thingspeak.com/channels/${channel.dchan}/charts/2?bgcolor=%23ffffff&color=%23007ad9&days=13&dynamic=true&type=line&height=200`;
-iframe2.src = buildURL2;
+iframe2.dataset.src = buildURL2;
 iframe2.width = '100%';
 iframe2.height = '200';
 td2.appendChild(iframe2);
@@ -488,6 +490,7 @@ if (field4Input && wakeHInput && sleepHInput) {
 
             const modeDiv = document.createElement('div');
             modeDiv.style.marginBottom = '8px';
+
             const modeLabel = document.createElement('label');
             modeLabel.textContent = 'Mode: ';
             modeLabel.htmlFor = `valve_${valve.channelId}_mode`;
@@ -497,6 +500,31 @@ if (field4Input && wakeHInput && sleepHInput) {
             modeInput.style.width = '60px';
             modeDiv.appendChild(modeLabel);
             modeDiv.appendChild(modeInput);
+
+            modeDiv.appendChild(document.createTextNode('\u00A0\u00A0'));
+
+            const battMinLabel = document.createElement('label');
+            battMinLabel.textContent = 'Bat Min: ';
+            battMinLabel.htmlFor = `valve_${valve.channelId}_battMin`;
+            const battMinInput = document.createElement('input');
+            battMinInput.type = 'number';
+            battMinInput.id = `valve_${valve.channelId}_battMin`;
+            battMinInput.style.width = '60px';
+            modeDiv.appendChild(battMinLabel);
+            modeDiv.appendChild(battMinInput);
+
+            modeDiv.appendChild(document.createTextNode('\u00A0\u00A0'));
+
+            const levelMinLabel = document.createElement('label');
+            levelMinLabel.textContent = 'Level Min: ';
+            levelMinLabel.htmlFor = `valve_${valve.channelId}_levelMin`;
+            const levelMinInput = document.createElement('input');
+            levelMinInput.type = 'number';
+            levelMinInput.id = `valve_${valve.channelId}_levelMin`;
+            levelMinInput.style.width = '60px';
+            modeDiv.appendChild(levelMinLabel);
+            modeDiv.appendChild(levelMinInput);
+
             container.appendChild(modeDiv);
 
             const table = document.createElement('table');
@@ -541,12 +569,14 @@ if (field4Input && wakeHInput && sleepHInput) {
                 chartRow.style.maxWidth = '900px';
 
                 const chart1 = document.createElement('iframe');
-                chart1.src = `https://api.thingspeak.com/channels/${valve.chartChannelId}/charts/1?bgcolor=%23ffffff&color=%23F18025&days=13&dynamic=true&type=line&height=200&api_key=${valve.chartAPIKey}`;
+                chart1.src = 'about:blank';
+                chart1.dataset.src = `https://api.thingspeak.com/channels/${valve.chartChannelId}/charts/1?bgcolor=%23ffffff&color=%23F18025&days=13&dynamic=true&type=line&height=200&api_key=${valve.chartAPIKey}`;
                 chart1.style.flex = '1';
                 chart1.height = '200';
 
                 const chart2 = document.createElement('iframe');
-                chart2.src = `https://api.thingspeak.com/channels/${valve.chartChannelId}/charts/2?bgcolor=%23ffffff&color=%23007ad9&days=13&dynamic=true&type=line&height=200&api_key=${valve.chartAPIKey}`;
+                chart2.src = 'about:blank';
+                chart2.dataset.src = `https://api.thingspeak.com/channels/${valve.chartChannelId}/charts/2?bgcolor=%23ffffff&color=%23007ad9&days=13&dynamic=true&type=line&height=200&api_key=${valve.chartAPIKey}`;
                 chart2.style.flex = '1';
                 chart2.height = '200';
 
@@ -561,6 +591,8 @@ if (field4Input && wakeHInput && sleepHInput) {
         function writeValve(valve) {
             const tbody = document.getElementById(`valve_${valve.channelId}_tbody`);
             const modeInput = document.getElementById(`valve_${valve.channelId}_mode`);
+            const battMinInput = document.getElementById(`valve_${valve.channelId}_battMin`);
+            const levelMinInput = document.getElementById(`valve_${valve.channelId}_levelMin`);
 
             const valveNumbers = [];
             const startTimes = [];
@@ -578,7 +610,9 @@ if (field4Input && wakeHInput && sleepHInput) {
                 field1: valveNumbers.join(''),
                 field2: startTimes.join(':'),
                 field3: modeInput.value || '0',
-                field4: durations.join(':')
+                field4: durations.join(':'),
+                field5: battMinInput.value || '0',
+                field6: levelMinInput.value || '0'
             };
 
             const url = `https://api.thingspeak.com/update?api_key=${valve.writeAPIKey}`;
@@ -601,6 +635,8 @@ if (field4Input && wakeHInput && sleepHInput) {
         function readValve(valve) {
             const updatedTd = document.getElementById(`valve_${valve.channelId}_updated`);
             const modeInput = document.getElementById(`valve_${valve.channelId}_mode`);
+            const battMinInput = document.getElementById(`valve_${valve.channelId}_battMin`);
+            const levelMinInput = document.getElementById(`valve_${valve.channelId}_levelMin`);
             const tbody = document.getElementById(`valve_${valve.channelId}_tbody`);
 
             fetch(`https://api.thingspeak.com/channels/${valve.channelId}/feeds.json?api_key=${valve.readAPIKey}&results=1`)
@@ -617,6 +653,8 @@ if (field4Input && wakeHInput && sleepHInput) {
                     const durations = (feeds.field4 || '').split(':');
 
                     if (modeInput) modeInput.value = feeds.field3 !== null ? feeds.field3 : '';
+                    if (battMinInput) battMinInput.value = feeds.field5 !== null ? feeds.field5 : '';
+                    if (levelMinInput) levelMinInput.value = feeds.field6 !== null ? feeds.field6 : '';
 
                     if (tbody) {
                         tbody.innerHTML = '';
@@ -657,6 +695,29 @@ if (field4Input && wakeHInput && sleepHInput) {
             initValves();
         }
 //just a comment 
+        // Chart iframes get their `src` set here instead of at creation
+        // time. If we set `src` immediately, the browser's tab spinner
+        // waits for every chart (15 total) to finish loading before it
+        // stops. Deferring the src assignment until after window 'load'
+        // has already fired lets the page report itself as loaded almost
+        // immediately, then the charts stream in afterward without
+        // re-triggering the spinner.
+        function loadDeferredIframes() {
+            document.querySelectorAll('iframe[data-src]').forEach(iframe => {
+                iframe.src = iframe.dataset.src;
+                iframe.removeAttribute('data-src');
+            });
+        }
+
+        if (document.readyState === 'complete') {
+            // window 'load' already fired before this script ran; load
+            // charts immediately instead of waiting for an event that
+            // already happened.
+            loadDeferredIframes();
+        } else {
+            window.addEventListener('load', loadDeferredIframes);
+        }
+
         document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
